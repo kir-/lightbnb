@@ -1,3 +1,5 @@
+DROP TABLE property_reviews, reservations, properties, users CASCADE;
+
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(255),
@@ -24,17 +26,19 @@ create table properties (
   active BOOLEAN
 );
 
-CREATE TABLE property_reviews (
-  id SERIAL PRIMARY KEY,
-  guest_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-  reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
-  property_id INTEGER REFERENCES properties(id) ON DELETE CASCADE
-);
-
 CREATE TABLE reservations (
   id SERIAL PRIMARY KEY,
   start_date TIMESTAMP,
   end_date TIMESTAMP,
   property_id INTEGER REFERENCES properties(id) ON DELETE CASCADE,
-  guest_id INTEGER REFERENCES property_reviews(id) ON DELETE CASCADE
+  guest_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE property_reviews (
+  id SERIAL PRIMARY KEY,
+  guest_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
+  property_id INTEGER REFERENCES properties(id) ON DELETE CASCADE,
+  rating INTEGER,
+  message VARCHAR(255)
 );
