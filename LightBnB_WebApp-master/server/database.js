@@ -1,13 +1,6 @@
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
-const { Pool} = require('pg');
-const pool = new Pool({
-  user: 'vagrant',
-  host: 'localhost',
-  password: '123',
-  database: 'lightbnb'
-});
-pool.connect(()=>console.log('work pls'));
+const db = require('../db/index');
 /// Users
 
 /**
@@ -17,7 +10,7 @@ pool.connect(()=>console.log('work pls'));
  */
 const getUserWithEmail = function(email) {
 
-  return pool.query(`SELECT * FROM users 
+  return db.query(`SELECT * FROM users 
   WHERE email = $1;`, [email]).then(res => {
     if (res.rows[0]) {
       // console.log(res.rows[0]);
@@ -47,7 +40,7 @@ exports.getUserWithEmail = getUserWithEmail;
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  return pool.query(`SELECT * FROM users 
+  return db.query(`SELECT * FROM users 
   WHERE id = $1;`, [id]).then(res => {
     if (res.rows[0]) {
       return res.rows[0];
@@ -67,9 +60,8 @@ exports.getUserWithId = getUserWithId;
  */
 const addUser =  function(user) {
   const {name, email, password} = user;
-  console.log(name,email,password);
   const vars = [name,email,password];
-  return pool.query(`INSERT INTO users (name,email,password) VALUES ($1,$2,$3)`,vars).then(res=>res.rows);
+  return db.query(`INSERT INTO users (name,email,password) VALUES ($1,$2,$3)`,vars).then(res=>res.rows);
   // const userId = Object.keys(users).length + 1;
   // user.id = userId;
   // users[userId] = user;
@@ -85,7 +77,7 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guestid, limit = 10) {
-  return pool.query(`SELECT properties.*, reservations.*, avg(rating) as average_rating
+  return db.query(`SELECT properties.*, reservations.*, avg(rating) as average_rating
   FROM reservations
   JOIN properties ON reservations.property_id = properties.id
   JOIN property_reviews ON properties.id = property_reviews.property_id 
@@ -107,7 +99,7 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  // return pool.query(`
+  // return db.query(`
   // SELECT * FROM properties
   // LIMIT $1
   // `, [limit]).then(res => res.rows);
@@ -118,31 +110,32 @@ const getAllProperties = function(options, limit = 10) {
   let queryString = `
   SELECT properties.*, avg(property_reviews.rating) as average_rating
   FROM properties
-  JOIN property_reviews ON properties.id = property_id
+  FULL JOIN property_reviews ON properties.id = property_id
   `;
 
   // 3
-  if (options.city) {
-    queryParams.push(`%${options.city}%`);
-    queryString += `WHERE city LIKE $${queryParams.length} `;
+  if (options.owner_id) {
+    queryParams.push(options.owner_id);
+    console.log(options.owner_id);
+    queryString += `WHERE owner_id = $${queryParams.length} `;
   }
 
-  if (options.owner_id) {
+  if (options.city) {
     queryParams.push(`%${options.city}%`);
-    queryString += `WHERE owner_id = $${queryParams.length} `;
+    queryString += `AND city LIKE $${queryParams.length} `;
   }
 
   if (options.minimum_price_per_night) {
     queryParams.push(options.minimum_price_per_night);
-    queryString += `WHERE cost_per_night > $${queryParams.length} `;
+    queryString += `AND cost_per_night > $${queryParams.length} `;
   }
   if (options.maximum_price_per_night) {
     queryParams.push(options.maximum_price_per_night);
-    queryString += `WHERE cost_per_night < $${queryParams.length} `;
+    queryString += `AND cost_per_night < $${queryParams.length} `;
   }
   if (options.minimum_rating) {
     queryParams.push(options.minimum_rating);
-    queryString += `WHERE rating > $${queryParams.length} `;
+    queryString += `AND rating > $${queryParams.length} `;
   }
   // 4
   queryParams.push(limit);
@@ -151,12 +144,12 @@ const getAllProperties = function(options, limit = 10) {
   ORDER BY cost_per_night
   LIMIT $${queryParams.length};
   `;
-
+  // console.log(options);
   // 5
-  console.log(queryString, queryParams);
+  // console.log(queryString, queryParams);
 
   // 6
-  return pool.query(queryString, queryParams).then(res => res.rows);
+  return db.query(queryString, queryParams).then(res => res.rows);
 //   const limitedProperties = {};
 //   for (let i = 1; i <= limit; i++) {
 //     limitedProperties[i] = properties[i];
@@ -172,9 +165,62 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  const {owner_id,
+    title,
+    description,
+    thumbnail_photo_url,
+    cover_photo_url,
+    cost_per_night,
+    street,
+    city,
+    province,
+    post_code,
+    country,
+    parking_spaces,
+    number_of_bathrooms,
+    number_of_bedrooms} = property;
+  const vars = [owner_id,
+    title,
+    description,
+    thumbnail_photo_url,
+    cover_photo_url,
+    cost_per_night,
+    street,
+    city,
+    province,
+    post_code,
+    country,
+    parking_spaces,
+    number_of_bathrooms,
+    number_of_bedrooms];
+  return db.query(`INSERT INTO properties (owner_id,
+    title,
+    description,
+    thumbnail_photo_url,
+    cover_photo_url,
+    cost_per_night,
+    street,
+    city,
+    province,
+    post_code,
+    country,
+    parking_spaces,
+    number_of_bathrooms,
+    number_of_bedrooms) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) 
+    RETURNING *;`,vars).then(res=>res.rows);
+  // const propertyId = Object.keys(properties).length + 1;
+  // property.id = propertyId;
+  // properties[propertyId] = property;
+  // return Promise.resolve(property);
 };
 exports.addProperty = addProperty;
+
+
+const addReservation = function(reservation){
+  return db.query(`INSERT INTO reservations (start_date,
+    end_date,
+    property_id,
+    guest_id) VALUES ($1,$2,$3,$4)
+    RETURNING *;`,reservation).then(res=>res.rows)
+};
+exports.addReservation = addReservation;
